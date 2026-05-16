@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Registrar - Loja de Bebidas{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>🍺 Criar Conta</h1>
+            <p>Registre-se no Sistema de Faturas</p>
+        </div>
+        
+        <form id="registerForm" class="auth-form">
+            <div class="form-group">
+                <label for="full_name">Nome Completo: *</label>
+                <input type="text" id="full_name" name="full_name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="username">Usuário: *</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email: *</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Senha: *</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="company_name">Nome da Empresa:</label>
+                <input type="text" id="company_name" name="company_name">
+            </div>
+            
+            <div class="form-group">
+                <label for="phone">Telefone:</label>
+                <input type="tel" id="phone" name="phone">
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-block">Registrar</button>
+        </form>
+        
+        <div class="auth-footer">
+            <p>Já tem conta? <a href="{{ url_for('login') }}">Fazer login</a></p>
+        </div>
+        
+        <div id="errorMessage" class="error-message" style="display:none;"></div>
+        <div id="successMessage" class="success-message" style="display:none;"></div>
+    </div>
+</div>
+
+<script>
+document.getElementById('registerForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = {
+        full_name: document.getElementById('full_name').value,
+        username: document.getElementById('username').value,
+        email: document.getElementById('email').value,
+        password: document.getElementById('password').value,
+        company_name: document.getElementById('company_name').value,
+        phone: document.getElementById('phone').value
+    };
+    
+    try {
+        const response = await fetch('/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        if (response.ok) {
+            document.getElementById('successMessage').textContent = 'Conta criada com sucesso! Redirecionando para login...';
+            document.getElementById('successMessage').style.display = 'block';
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 2000);
+        } else {
+            const data = await response.json();
+            showError(data.error);
+        }
+    } catch (error) {
+        showError('Erro ao registrar. Tente novamente.');
+    }
+});
+
+function showError(message) {
+    const errorDiv = document.getElementById('errorMessage');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
+</script>
+{% endblock %}

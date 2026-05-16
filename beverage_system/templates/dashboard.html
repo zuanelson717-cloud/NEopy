@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Loja de Bebidas{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <h1>Bem-vindo, {{ session.full_name }}!</h1>
+    <p>Gerencie suas faturas e acompanhe seus pedidos</p>
+</div>
+
+<div class="stats-container">
+    <div class="stat-card">
+        <div class="stat-icon">📄</div>
+        <div class="stat-info">
+            <p class="stat-label">Total de Faturas</p>
+            <p class="stat-value">{{ total_invoices }}</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon">💰</div>
+        <div class="stat-info">
+            <p class="stat-label">Valor Total</p>
+            <p class="stat-value">R$ {{ "%.2f"|format(total_amount) }}</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon">⏳</div>
+        <div class="stat-info">
+            <p class="stat-label">Pendentes</p>
+            <p class="stat-value">R$ {{ "%.2f"|format(pending_amount) }}</p>
+        </div>
+    </div>
+</div>
+
+<div class="invoices-section">
+    <div class="section-header">
+        <h2>Minhas Faturas</h2>
+        <button class="btn btn-primary" onclick="openNewInvoiceModal()">+ Nova Fatura</button>
+    </div>
+    
+    {% if invoices %}
+    <div class="invoices-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nº Fatura</th>
+                    <th>Data</th>
+                    <th>Valor</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for invoice in invoices %}
+                <tr>
+                    <td>#{{ invoice.invoice_number }}</td>
+                    <td>{{ invoice.issue_date[:10] }}</td>
+                    <td>R$ {{ "%.2f"|format(invoice.total_amount) }}</td>
+                    <td>
+                        <span class="status-badge status-{{ invoice.status }}">
+                            {% if invoice.status == 'pending' %}
+                                ⏳ Pendente
+                            {% elif invoice.status == 'paid' %}
+                                ✓ Pago
+                            {% else %}
+                                {{ invoice.status }}
+                            {% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('view_invoice', invoice_id=invoice.id) }}" class="btn btn-sm btn-info">Visualizar</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>Nenhuma fatura encontrada</p>
+    </div>
+    {% endif %}
+</div>
+
+<div id="newInvoiceModal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <span class="close" onclick="closeNewInvoiceModal()">&times;</span>
+        <h2>Nova Fatura</h2>
+        <form id="newInvoiceForm">
+            <div class="form-group">
+                <label for="invoice_number">Nº Fatura:</label>
+                <input type="text" id="invoice_number" required>
+            </div>
+            <div class="form-group">
+                <label for="total_amount">Valor Total:</label>
+                <input type="number" id="total_amount" step="0.01" required>
+            </div>
+            <div class="form-group">
+                <label for="description">Descrição:</label>
+                <textarea id="description"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Criar Fatura</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function openNewInvoiceModal() {
+    document.getElementById('newInvoiceModal').style.display = 'block';
+}
+
+function closeNewInvoiceModal() {
+    document.getElementById('newInvoiceModal').style.display = 'none';
+}
+
+document.getElementById('newInvoiceForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const data = {
+        invoice_number: document.getElementById('invoice_number').value,
+        total_amount: parseFloat(document.getElementById('total_amount').value),
+        description: document.getElementById('description').value,
+        items: []
+    };
+    
+    try {
+        const response = await fetch('/api/invoices', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            alert('Fatura criada com sucesso!');
+            location.reload();
+        } else {
+            const error = await response.json();
+            alert('Erro: ' + error.error);
+        }
+    } catch (error) {
+        alert('Erro ao criar fatura: ' + error);
+    }
+});
+
+window.onclick = function(event) {
+    const modal = document.getElementById('newInvoiceModal');
+    if (event.target === modal) {
+        modal.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}

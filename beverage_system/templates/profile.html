@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Perfil - Loja de Bebidas{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-header">
+        <h1>👤 Meu Perfil</h1>
+    </div>
+    
+    <div class="profile-card">
+        <form id="profileForm" class="profile-form">
+            <div class="form-group">
+                <label for="full_name">Nome Completo:</label>
+                <input type="text" id="full_name" value="{{ user.full_name }}" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" value="{{ user.email }}" disabled>
+                <small>Email não pode ser alterado</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="company_name">Nome da Empresa:</label>
+                <input type="text" id="company_name" value="{{ user.company_name or '' }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="phone">Telefone:</label>
+                <input type="tel" id="phone" value="{{ user.phone or '' }}">
+            </div>
+            
+            <div class="form-group">
+                <label>Membro desde:</label>
+                <p class="info-text">{{ user.created_at[:10] }}</p>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+        </form>
+        
+        <div id="successMessage" class="success-message" style="display:none;">Perfil atualizado com sucesso!</div>
+        <div id="errorMessage" class="error-message" style="display:none;"></div>
+    </div>
+</div>
+
+<script>
+document.getElementById('profileForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const data = {
+        full_name: document.getElementById('full_name').value,
+        company_name: document.getElementById('company_name').value,
+        phone: document.getElementById('phone').value
+    };
+    
+    try {
+        const response = await fetch('/profile/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            document.getElementById('successMessage').style.display = 'block';
+            setTimeout(() => {
+                document.getElementById('successMessage').style.display = 'none';
+            }, 3000);
+        } else {
+            const error = await response.json();
+            showError(error.error);
+        }
+    } catch (error) {
+        showError('Erro ao atualizar perfil: ' + error);
+    }
+});
+
+function showError(message) {
+    const errorDiv = document.getElementById('errorMessage');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Fatura #{{ invoice.invoice_number }} - Loja de Bebidas{% endblock %}
+
+{% block content %}
+<div class="invoice-container">
+    <div class="invoice-header">
+        <div>
+            <h1>Fatura #{{ invoice.invoice_number }}</h1>
+            <p class="invoice-date">Emitida em: {{ invoice.issue_date[:10] }}</p>
+        </div>
+        <div class="invoice-actions">
+            <button onclick="window.print()" class="btn btn-secondary">🖨️ Imprimir</button>
+            <button onclick="downloadPDF()" class="btn btn-secondary">📥 Baixar PDF</button>
+        </div>
+    </div>
+    
+    <div class="invoice-content">
+        <div class="invoice-info">
+            <div class="info-block">
+                <h3>Empresa</h3>
+                <p><strong>{{ user.company_name or user.full_name }}</strong></p>
+                <p>{{ user.email }}</p>
+                <p>{{ user.phone }}</p>
+            </div>
+            
+            <div class="info-block">
+                <h3>Status da Fatura</h3>
+                <p class="status-badge status-{{ invoice.status }}">
+                    {% if invoice.status == 'pending' %}
+                        ⏳ Pendente
+                    {% elif invoice.status == 'paid' %}
+                        ✓ Pago
+                    {% else %}
+                        {{ invoice.status }}
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        
+        {% if items %}
+        <div class="items-table">
+            <h3>Itens da Fatura</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Quantidade</th>
+                        <th>Preço Unitário</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>{{ item.product_name }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>R$ {{ "%.2f"|format(item.unit_price) }}</td>
+                        <td>R$ {{ "%.2f"|format(item.total_price) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        
+        <div class="invoice-summary">
+            <div class="summary-row">
+                <span>Descrição:</span>
+                <span>{{ invoice.description or 'N/A' }}</span>
+            </div>
+            <div class="summary-row total">
+                <span>Valor Total:</span>
+                <span>R$ {{ "%.2f"|format(invoice.total_amount) }}</span>
+            </div>
+        </div>
+        
+        {% if invoice.status == 'pending' %}
+        <div class="invoice-actions-footer">
+            <button onclick="markAsPaid()" class="btn btn-success">✓ Marcar como Pago</button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function markAsPaid() {
+    if (confirm('Deseja marcar esta fatura como paga?')) {
+        fetch('/api/invoices/{{ invoice.id }}/status', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({status: 'paid'})
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            location.reload();
+        })
+        .catch(error => alert('Erro: ' + error));
+    }
+}
+
+function downloadPDF() {
+    alert('Funcionalidade de download em PDF será implementada em breve!');
+}
+</script>
+{% endblock %}

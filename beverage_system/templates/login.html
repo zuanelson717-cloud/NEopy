@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Loja de Bebidas{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>🍺 Beverage Store</h1>
+            <p>Sistema de Gerenciamento de Faturas</p>
+        </div>
+        
+        <form id="loginForm" class="auth-form">
+            <div class="form-group">
+                <label for="username">Usuário:</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Senha:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+        </form>
+        
+        <div class="auth-footer">
+            <p>Não tem conta? <a href="{{ url_for('register') }}">Criar uma conta</a></p>
+        </div>
+        
+        <div id="errorMessage" class="error-message" style="display:none;"></div>
+    </div>
+</div>
+
+<script>
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    
+    try {
+        const response = await fetch('/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({username, password})
+        });
+        
+        if (response.ok) {
+            window.location.href = '/dashboard';
+        } else {
+            const data = await response.json();
+            showError(data.error);
+        }
+    } catch (error) {
+        showError('Erro ao fazer login. Tente novamente.');
+    }
+});
+
+function showError(message) {
+    const errorDiv = document.getElementById('errorMessage');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
+</script>
+{% endblock %}
