@@ -98,9 +98,44 @@ class Database:
             )
         ''')
         
+        # Tabela de Matérias de Informática (Entrada/Saída)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS materiais_informatica (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                descricao TEXT NOT NULL,
+                categoria TEXT NOT NULL,
+                numero_serie TEXT UNIQUE,
+                valor_unitario REAL,
+                quantidade_total INTEGER,
+                quantidade_disponivel INTEGER,
+                data_entrada TEXT,
+                fornecedor TEXT,
+                localizacao TEXT,
+                status TEXT DEFAULT 'ativo',
+                observacoes TEXT,
+                data_cadastro TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Tabela de Movimentação de Matérias (Entrada/Saída)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS movimentacao_materiais (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                material_id INTEGER NOT NULL,
+                tipo_movimentacao TEXT NOT NULL,
+                quantidade INTEGER,
+                data_movimentacao TEXT DEFAULT CURRENT_TIMESTAMP,
+                usuario_id INTEGER,
+                responsavel TEXT,
+                motivo TEXT,
+                observacoes TEXT,
+                FOREIGN KEY (material_id) REFERENCES materiais_informatica(id)
+            )
+        ''')
+        
         conn.commit()
         conn.close()
-        print("✅ Banco de dados inicializado com sucesso!")
+        print("\u2705 Banco de dados inicializado com sucesso!")
     
     # ========== OPERAÇÕES COM PESSOAS ==========
     
@@ -172,129 +207,138 @@ class Database:
         
         return True
     
-    def buscar_pessoa_cpf(self, cpf):
-        """Busca pessoa por CPF"""
+    # ========== OPERAÇÕES COM MATÉRIAS DE INFORMÁTICA ==========
+    
+    def adicionar_material(self, descricao, categoria, numero_serie, valor_unitario, quantidade_total, 
+                          data_entrada, fornecedor, localizacao, observacoes=''):
+        """Adiciona um novo material de informática"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                INSERT INTO materiais_informatica 
+                (descricao, categoria, numero_serie, valor_unitario, quantidade_total, 
+                 quantidade_disponivel, data_entrada, fornecedor, localizacao, observacoes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (descricao, categoria, numero_serie, valor_unitario, quantidade_total, 
+                  quantidade_total, data_entrada, fornecedor, localizacao, observacoes))
+            
+            conn.commit()
+            material_id = cursor.lastrowid
+            conn.close()
+            
+            return material_id
+        except sqlite3.IntegrityError:
+            return None
+    
+    def obter_todos_materiais(self):
+        """Retorna todos os materiais cadastrados"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        cursor.execute('SELECT * FROM pessoas WHERE cpf = ? AND ativo = 1', (cpf,))
-        pessoa = dict(cursor.fetchone() or {})
+        cursor.execute('SELECT * FROM materiais_informatica WHERE status = "ativo" ORDER BY data_cadastro DESC')
+        materiais = [dict(row) for row in cursor.fetchall()]
         
         conn.close()
-        return pessoa
+        return materiais
     
-    # ========== OPERAÇÕES COM QUESTÕES ==========
+    def obter_material(self, material_id):
+        """Retorna dados de um material específico"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM materiais_informatica WHERE id = ? AND status = "ativo"', (material_id,))
+        material = dict(cursor.fetchone() or {})
+        
+        conn.close()
+        return material
     
-    def adicionar_questao(self, pergunta, opcao_a, opcao_b, opcao_c, opcao_d, resposta_correta, dificuldade='medio'):
-        """Adiciona uma nova questão"""
+    def registrar_movimentacao(self, material_id, tipo_movimentacao, quantidade, responsavel, motivo='', observacoes=''):
+        """Registra entrada ou saída de material"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Registrar movimentação
+            cursor.execute('''
+                INSERT INTO movimentacao_materiais 
+                (material_id, tipo_movimentacao, quantidade, responsavel, motivo, observacoes)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (material_id, tipo_movimentacao, quantidade, responsavel, motivo, observacoes))
+            
+            # Atualizar quantidade disponível
+            if tipo_movimentacao.lower() == 'entrada':
+                cursor.execute('UPDATE materiais_informatica SET quantidade_disponivel = quantidade_disponivel + ? WHERE id = ?',
+                             (quantidade, material_id))
+            elif tipo_movimentacao.lower() == 'saida':
+                cursor.execute('UPDATE materiais_informatica SET quantidade_disponivel = quantidade_disponivel - ? WHERE id = ?',
+                             (quantidade, material_id))
+            
+            conn.commit()
+            movimentacao_id = cursor.lastrowid
+            conn.close()
+            
+            return movimentacao_id
+        except Exception as e:
+            conn.close()
+            print(f"Erro ao registrar movimentação: {e}")
+            return None
+    
+    def obter_movimentacoes_material(self, material_id):
+        """Retorna histórico de movimentações de um material"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
         cursor.execute('''
-            INSERT INTO questoes (pergunta, opcao_a, opcao_b, opcao_c, opcao_d, resposta_correta, dificuldade)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (pergunta, opcao_a, opcao_b, opcao_c, opcao_d, resposta_correta, dificuldade))
+            SELECT * FROM movimentacao_materiais 
+            WHERE material_id = ? 
+            ORDER BY data_movimentacao DESC
+        ''', (material_id,))
         
-        conn.commit()
-        questao_id = cursor.lastrowid
-        conn.close()
-        
-        return questao_id
-    
-    def obter_todas_questoes(self, dificuldade=None):
-        """Retorna todas as questões"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        if dificuldade:
-            cursor.execute('SELECT * FROM questoes WHERE dificuldade = ?', (dificuldade,))
-        else:
-            cursor.execute('SELECT * FROM questoes')
-        
-        questoes = [dict(row) for row in cursor.fetchall()]
+        movimentacoes = [dict(row) for row in cursor.fetchall()]
         
         conn.close()
-        return questoes
+        return movimentacoes
     
-    def obter_questoes_aleatorias(self, quantidade=10, dificuldade=None):
-        """Retorna questões aleatórias"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        if dificuldade:
-            cursor.execute('SELECT * FROM questoes WHERE dificuldade = ? ORDER BY RANDOM() LIMIT ?', 
-                          (dificuldade, quantidade))
-        else:
-            cursor.execute('SELECT * FROM questoes ORDER BY RANDOM() LIMIT ?', (quantidade,))
-        
-        questoes = [dict(row) for row in cursor.fetchall()]
-        
-        conn.close()
-        return questoes
-    
-    # ========== OPERAÇÕES COM RESPOSTAS DO QUIZ ==========
-    
-    def salvar_resposta_quiz(self, pessoa_id, questao_id, resposta_dada, correta, tempo_gasto):
-        """Salva resposta de uma questão"""
+    def obter_todas_movimentacoes(self):
+        """Retorna todas as movimentações de materiais"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
         cursor.execute('''
-            INSERT INTO respostas_quiz (pessoa_id, questao_id, resposta_dada, correta, tempo_gasto)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (pessoa_id, questao_id, resposta_dada, 1 if correta else 0, tempo_gasto))
+            SELECT mm.*, mi.descricao FROM movimentacao_materiais mm
+            JOIN materiais_informatica mi ON mm.material_id = mi.id
+            ORDER BY mm.data_movimentacao DESC
+        ''')
         
-        conn.commit()
+        movimentacoes = [dict(row) for row in cursor.fetchall()]
+        
         conn.close()
+        return movimentacoes
     
-    def salvar_resultado_quiz(self, pessoa_id, total_questoes, acertos, erros, percentual_acerto, tempo_total, passou):
-        """Salva resultado final do quiz"""
+    def obter_relatorio_materiais(self):
+        """Gera relatório de todos os materiais com movimentações"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
         cursor.execute('''
-            INSERT INTO resultados_quiz (pessoa_id, total_questoes, acertos, erros, percentual_acerto, tempo_total, passou)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (pessoa_id, total_questoes, acertos, erros, percentual_acerto, tempo_total, 1 if passou else 0))
+            SELECT 
+                mi.*,
+                COUNT(mm.id) as total_movimentacoes,
+                SUM(CASE WHEN mm.tipo_movimentacao = 'entrada' THEN mm.quantidade ELSE 0 END) as total_entradas,
+                SUM(CASE WHEN mm.tipo_movimentacao = 'saida' THEN mm.quantidade ELSE 0 END) as total_saidas
+            FROM materiais_informatica mi
+            LEFT JOIN movimentacao_materiais mm ON mi.id = mm.material_id
+            WHERE mi.status = 'ativo'
+            GROUP BY mi.id
+            ORDER BY mi.data_cadastro DESC
+        ''')
         
-        conn.commit()
-        resultado_id = cursor.lastrowid
-        conn.close()
-        
-        return resultado_id
-    
-    def obter_resultados_pessoa(self, pessoa_id):
-        """Retorna histórico de resultados de uma pessoa"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT * FROM resultados_quiz WHERE pessoa_id = ? ORDER BY data_conclusao DESC', (pessoa_id,))
-        resultados = [dict(row) for row in cursor.fetchall()]
+        relatorio = [dict(row) for row in cursor.fetchall()]
         
         conn.close()
-        return resultados
-    
-    def obter_estatisticas_geral(self):
-        """Retorna estatísticas gerais"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT COUNT(*) as total FROM pessoas WHERE ativo = 1')
-        total_pessoas = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT COUNT(*) as total FROM resultados_quiz WHERE passou = 1')
-        total_aprovados = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT AVG(percentual_acerto) as media FROM resultados_quiz')
-        media_acertos = cursor.fetchone()[0] or 0
-        
-        conn.close()
-        
-        return {
-            'total_pessoas': total_pessoas,
-            'total_aprovados': total_aprovados,
-            'media_acertos': round(media_acertos, 2)
-        }
+        return relatorio
 
 
 # Instância global do banco de dados
